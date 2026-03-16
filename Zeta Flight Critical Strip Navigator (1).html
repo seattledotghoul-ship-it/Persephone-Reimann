@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>ZETA FLIGHT · CRITICAL STRIP NAVIGATION</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+    }
+    canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+    /* ----- HUD overlay ----- */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      color: #b0ffb0;
+      text-shadow: 0 0 5px #0f0, 0 0 2px #0a0;
+      font-size: 14px;
+      padding: 20px;
+      z-index: 100;
+    }
+    .hud-panel {
+      background: rgba(0, 20, 0, 0.75);
+      border: 1px solid #2f9;
+      border-radius: 8px;
+      padding: 12px 18px;
+      backdrop-filter: blur(2px);
+      box-shadow: 0 0 15px rgba(0, 255, 100, 0.2);
+    }
+    #hud-left {
+      position: absolute;
+      bottom: 30px;
+      left: 30px;
+      width: 280px;
+    }
+    #hud-right {
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      width: 220px;
+      text-align: right;
+    }
+    #hud-top {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      text-align: center;
+      background: rgba(0, 30, 0, 0.8);
+      border: 1px solid #2f9;
+      border-radius: 40px;
+      padding: 8px 20px;
+      letter-spacing: 2px;
+    }
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+    .label {
+      color: #8f8;
+      opacity: 0.7;
+    }
+    .value {
+      color: #efe;
+      font-weight: bold;
+    }
+    .waypoint {
+      border-top: 1px solid #2f9;
+      margin-top: 8px;
+      padding-top: 8px;
+    }
+    .waypoint-item {
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .horizon-tape {
+      background: #030;
+      height: 6px;
+      width: 100%;
+      margin: 8px 0;
+      position: relative;
+      border-radius: 3px;
+    }
+    .horizon-indicator {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #2f9;
+      border-radius: 50%;
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 0 12px #0f0;
+    }
+    .compass {
+      font-size: 12px;
+      letter-spacing: 3px;
+    }
+    .compass span {
+      display: inline-block;
+      width: 30px;
+      color: #6f6;
+    }
+    .compass .active {
+      color: #fff;
+      font-weight: bold;
+      text-shadow: 0 0 10px #0f0;
+    }
+    #crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border: 2px solid #2f9;
+      border-radius: 20px;
+      pointer-events: none;
+      z-index: 200;
+      opacity: 0.6;
+      box-shadow: 0 0 15px #0f0;
+    }
+    #crosshair::before,
+    #crosshair::after {
+      content: '';
+      position: absolute;
+      background: #2f9;
+    }
+    #crosshair::before {
+      width: 20px;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #crosshair::after {
+      width: 2px;
+      height: 20px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #tooltip {
+      position: fixed;
+      background: rgba(0, 20, 0, 0.95);
+      border: 1px solid #2f9;
+      color: #cfc;
+      padding: 6px 12px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 1000;
+      border-radius: 4px;
+      box-shadow: 0 0 20px #0f0;
+      max-width: 260px;
+      transition: opacity 0.1s;
+      opacity: 0;
+    }
+    #tooltip.show { opacity: 1; }
+    .tt-title { color: #9f9; margin-bottom: 2px; }
+    .layer-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      pointer-events: auto;
+      z-index: 300;
+      display: flex;
+      gap: 8px;
+      background: rgba(0,30,0,0.7);
+      padding: 8px 15px;
+      border-radius: 30px;
+      border: 1px solid #2f9;
+      backdrop-filter: blur(4px);
+    }
+    .layer-toggle button {
+      background: transparent;
+      border: 1px solid #2f9;
+      color: #9f9;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .layer-toggle button.on {
+      background: #2f9;
+      color: #000;
+      box-shadow: 0 0 15px #0f0;
+    }
+    .layer-toggle button:hover {
+      background: #2f9;
+      color: #000;
+    }
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      color: #2f9;
+      font-size: 24px;
+      gap: 20px;
+    }
+    #loading .bar {
+      width: 300px;
+      height: 2px;
+      background: #0a0;
+      position: relative;
+      overflow: hidden;
+    }
+    #loading .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #2f9;
+      animation: load 2.5s ease-out forwards;
+    }
+    @keyframes load { to { width: 100%; } }
+    #loading .sub {
+      font-size: 14px;
+      color: #8f8;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div>ζ(s) · CRITICAL STRIP</div>
+    <div class="bar"><div class="bar-fill"></div></div>
+    <div class="sub">INITIALIZING FIELD · RIEMANN ZEROS · SCHUMANN BEACONS</div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <!-- HUD overlay -->
+  <div id="hud">
+    <div id="hud-top">
+      <span class="compass">
+        <span>−40i</span> <span>−20i</span> <span class="active">0i</span> <span>+20i</span> <span>+40i</span>
+      </span>
+      <div class="horizon-tape">
+        <div class="horizon-indicator" style="left: 50%;"></div>
+      </div>
+      <span>CRITICAL LINE Re = ½</span>
+    </div>
+
+    <div id="hud-left" class="hud-panel">
+      <div class="data-row"><span class="label">IMAGINARY t</span> <span class="value" id="hud-t">0.000</span></div>
+      <div class="data-row"><span class="label">|ζ(½+it)|</span> <span class="value" id="hud-mag">1.460</span></div>
+      <div class="data-row"><span class="label">GROUND SPEED</span> <span class="value" id="hud-speed">0.24 kζ</span></div>
+      <div class="data-row"><span class="label">WAYPOINT</span> <span class="value" id="hud-wpt">—</span></div>
+      <div class="data-row"><span class="label">DISTANCE</span> <span class="value" id="hud-dist">—</span></div>
+      <div class="waypoint">
+        <div class="waypoint-item"><span>ζ₁ (14.13)</span><span>141 Hz</span></div>
+        <div class="waypoint-item"><span>ζ₂ (21.02)</span><span>210 Hz</span></div>
+        <div class="waypoint-item"><span>ζ₃ (25.01)</span><span>250 Hz</span></div>
+        <div class="waypoint-item"><span>ζ₄ (30.42)</span><span>304 Hz</span></div>
+        <div class="waypoint-item"><span>ζ₅ (32.94)</span><span>329 Hz</span></div>
+        <div class="waypoint-item"><span>ζ₈ (43.33)</span><span>433 Hz</span></div>
+      </div>
+    </div>
+
+    <div id="hud-right" class="hud-panel">
+      <div class="data-row"><span class="label">SCHUMANN</span> <span class="value" id="hud-schumann">7.83 Hz</span></div>
+      <div class="data-row"><span class="label">f₂ (14.3)</span> <span class="value" id="hud-s2">≈ ζ₁</span></div>
+      <div class="data-row"><span class="label">f₃ (20.8)</span> <span class="value" id="hud-s3">≈ ζ₂</span></div>
+      <div class="data-row"><span class="label">f₅ (33.8)</span> <span class="value" id="hud-s5">≈ ζ₅</span></div>
+      <div class="data-row" style="margin-top:12px;"><span class="label">RANGE</span> <span class="value">92 km</span></div>
+      <div class="data-row"><span class="label">FUEL</span> <span class="value">∞</span></div>
+      <div class="data-row"><span class="label">SYSTEM</span> <span class="value">ζ-NAV</span></div>
+    </div>
+  </div>
+
+  <div id="crosshair"></div>
+
+  <!-- minimal layer toggles (still interactive) -->
+  <div class="layer-toggle">
+    <button id="toggleZeros" class="on">ZEROS</button>
+    <button id="toggleFlow" class="on">FLOW</button>
+    <button id="toggleMag" class="on">MAG</button>
+    <button id="toggleSchumann" class="on">SCHUMANN</button>
+  </div>
+
+  <div id="tooltip"><div class="tt-title" id="tt-title"></div><div id="tt-body"></div></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    (function() {
+      // ----- CONSTANTS (pure math) -----
+      const PHI = (1+Math.sqrt(5))/2;
+      const RAD = Math.PI/180;
+      const J2000 = 2451545.0;
+
+      // Riemann zeta zeros (first ten, imaginary parts)
+      const Z = [14.134725, 21.022040, 25.010858, 30.424876, 32.935062,
+                 37.586178, 40.918720, 43.327073, 48.005150, 49.773832];
+      // Schumann resonances (Earth-ionosphere)
+      const SCHUMANN = [7.83, 14.3, 20.8, 27.3, 33.8];
+
+      // ----- Helper functions -----
+      function zetaMag(t, N=40) {
+        if (Math.abs(t) < 0.5) t = 0.5;
+        let re = 0, im = 0;
+        for (let n = 1; n <= N; n++) {
+          const m = Math.pow(n, -0.5);
+          const a = t * Math.log(n);
+          re += m * Math.cos(a);
+          im -= m * Math.sin(a);
+        }
+        return Math.sqrt(re*re + im*im);
+      }
+
+      // Scale factors for 3D
+      const SR = 7.2;   // real axis scale
+      const SZ = 0.76;  // imaginary axis scale (z)
+      const SM = 4.2;   // magnitude scale
+
+      function ix(re) { return (re - 0.5) * SR; }
+      function iz(im) { return im * SZ; }
+
+      // ----- THREE.JS setup -----
+      const container = document.getElementById('canvas-container');
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setClearColor(0x001010, 1); // deep green-black
+      container.appendChild(renderer.domElement);
+      const canvas = renderer.domElement;
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x001010, 0.007);
+
+      const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
+      // set default to look along the critical line, like an approach view
+      const camState = { r: 58, th: -0.3, ph: 0.42, tx: 0, ty: 3.5 };
+      const defaultCam = { r: 58, th: -0.3, ph: 0.42, tx: 0, ty: 3.5 };
+      function updateCamera() {
+        const x = camState.r * Math.sin(camState.ph) * Math.sin(camState.th);
+        const y = camState.r * Math.cos(camState.ph);
+        const z = camState.r * Math.sin(camState.ph) * Math.cos(camState.th);
+        camera.position.set(x + camState.tx, y + camState.ty, z);
+        camera.lookAt(camState.tx, camState.ty, 0);
+      }
+      updateCamera();
+
+      // lighting
+      scene.add(new THREE.AmbientLight(0x203030, 3));
+      const dl = new THREE.DirectionalLight(0x406060, 1.8);
+      dl.position.set(10, 30, 20);
+      scene.add(dl);
+      const pl = new THREE.PointLight(0x2f9, 2, 90);
+      pl.position.set(0, 10, 0);
+      scene.add(pl);
+
+      // grid floor (complex plane)
+      const grid = new THREE.GridHelper(140, 44, 0x2f9, 0x1a4);
+      grid.material.transparent = true;
+      grid.material.opacity = 0.25;
+      scene.add(grid);
+
+      // Groups for layers
+      const groups = {
+        zeros: new THREE.Group(),
+        flow: new THREE.Group(),
+        mag: new THREE.Group(),
+        schumann: new THREE.Group()
+      };
+      Object.values(groups).forEach(g => scene.add(g));
+
+      // ----- CRITICAL LINE SPINE (Re=½) -----
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x2f9, transparent: true, opacity: 0.6 });
+      const spineGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, iz(-58)),
+        new THREE.Vector3(0, 0, iz(58))
+      ]);
+      groups.mag.add(new THREE.Line(spineGeo, lineMat));
+
+      // thicker cylinder for glow
+      const cyl = new THREE.CylinderGeometry(0.15, 0.15, 120, 8);
+      cyl.rotateX(Math.PI/2);
+      const cylMat = new THREE.MeshBasicMaterial({ color: 0x2f9, transparent: true, opacity: 0.12 });
+      groups.mag.add(new THREE.Mesh(cyl, cylMat));
+
+      // ----- ZEROS (red spheres as waypoints) -----
+      const zeroMeshes = [];
+      Z.forEach((z, i) => {
+        [1, -1].forEach(sg => {
+          const geo = new THREE.SphereGeometry(0.68, 24, 24);
+          const mat = new THREE.MeshPhongMaterial({
+            color: 0xff3333,
+            emissive: 0xaa2222,
+            emissiveIntensity: 0.8,
+            shininess: 140,
+            transparent: true,
+            opacity: 0.95
+          });
+          const sphere = new THREE.Mesh(geo, mat);
+          sphere.position.set(0, 0, iz(sg * z));
+          sphere.userData = { idx: i, sg, z, label: `ζ${i+1}` };
+          groups.zeros.add(sphere);
+          zeroMeshes.push(sphere);
+
+          // glow ring
+          const ringGeo = new THREE.TorusGeometry(1.02, 0.08, 8, 32);
+          ringGeo.rotateX(Math.PI/2);
+          const ringMat = new THREE.MeshBasicMaterial({ color: 0xff6666, transparent: true, opacity: 0.25 });
+          const ring = new THREE.Mesh(ringGeo, ringMat);
+          ring.position.copy(sphere.position);
+          ring.userData.isRing = true;
+          groups.zeros.add(ring);
+
+          // floor marker
+          const markerGeo = new THREE.RingGeometry(1.4, 1.6, 24);
+          markerGeo.rotateX(-Math.PI/2);
+          const markerMat = new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+          const marker = new THREE.Mesh(markerGeo, markerMat);
+          marker.position.set(0, -0.05, iz(sg * z));
+          groups.zeros.add(marker);
+        });
+      });
+
+      // ----- MAGNITUDE CURVE (blue/cyan) -----
+      (function buildMagnitude() {
+        const ptsPos = [new THREE.Vector3(0, zetaMag(0.5) * SM, 0)];
+        const ptsNeg = [new THREE.Vector3(0, zetaMag(0.5) * SM, 0)];
+        for (let t = 0.3; t <= 54; t += 0.3) {
+          const mag = Math.min(zetaMag(t), 4.5);
+          ptsPos.push(new THREE.Vector3(0, mag * SM, iz(t)));
+          ptsNeg.push(new THREE.Vector3(0, mag * SM, iz(-t)));
+        }
+        const mat = new THREE.LineBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.65 });
+        groups.mag.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsPos), mat));
+        groups.mag.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsNeg), mat));
+
+        // add small marker at ζ(½)
+        const halfSphere = new THREE.SphereGeometry(0.3, 16, 16);
+        const halfMat = new THREE.MeshPhongMaterial({ color: 0xaaddff, emissive: 0x226688 });
+        const halfNode = new THREE.Mesh(halfSphere, halfMat);
+        halfNode.position.set(0, zetaMag(0.5) * SM, 0);
+        halfNode.userData.isZetaHalf = true;
+        groups.mag.add(halfNode);
+      })();
+
+      // ----- SCHUMANN RESONANCES (amber rings) -----
+      SCHUMANN.forEach((f, i) => {
+        [1, -1].forEach(sg => {
+          const zpos = iz(sg * f);
+          const ringGeo = new THREE.RingGeometry(2.4, 2.7, 32);
+          ringGeo.rotateX(-Math.PI/2);
+          const ringMat = new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
+          const ring = new THREE.Mesh(ringGeo, ringMat);
+          ring.position.set(0, -0.03, zpos);
+          groups.schumann.add(ring);
+
+          const lineGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-50, -0.02, zpos),
+            new THREE.Vector3(50, -0.02, zpos)
+          ]);
+          const lineMat = new THREE.LineBasicMaterial({ color: 0xffaa33, transparent: true, opacity: 0.18 });
+          groups.schumann.add(new THREE.Line(lineGeo, lineMat));
+        });
+      });
+
+      // ----- FLOW PARTICLES (laminar flow) -----
+      const particleCount = 280;
+      const pPos = new Float32Array(particleCount * 3);
+      const pCol = new Float32Array(particleCount * 3);
+      const pGeo = new THREE.BufferGeometry();
+      pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+      pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+      const pMat = new THREE.PointsMaterial({ size: 0.35, vertexColors: true, transparent: true, opacity: 0.7, sizeAttenuation: true });
+      const points = new THREE.Points(pGeo, pMat);
+      groups.flow.add(points);
+
+      const particles = [];
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          re: -3 + Math.random() * 5,
+          im: (Math.random() * 100 - 50) * 0.8,
+          age: 0,
+          maxAge: 200 + Math.random() * 300,
+          speed: 0.18 + Math.random() * 0.3,
+          br: 0.5 + Math.random() * 0.5
+        });
+      }
+
+      function updateParticles(dt) {
+        for (let i = 0; i < particleCount; i++) {
+          const p = particles[i];
+          // simple gradient toward zeros (very simplified)
+          let vx = 0, vz = 0;
+          Z.forEach(z => {
+            [1, -1].forEach(sg => {
+              const dx = 0.5 - p.re;
+              const dz = sg * z - p.im;
+              const d2 = dx*dx + dz*dz;
+              if (d2 < 0.01) return;
+              vx += dx / (d2 + 0.2);
+              vz += dz / (d2 + 0.2);
+            });
+          });
+          const len = Math.sqrt(vx*vx + vz*vz);
+          if (len > 0) {
+            p.re += (vx/len) * p.speed * 0.04;
+            p.im += (vz/len) * p.speed * 0.04;
+          }
+          p.age++;
+
+          // reset if too far or near zero
+          let nearZero = false;
+          Z.forEach(z => {
+            [1, -1].forEach(sg => {
+              if (Math.hypot(p.re-0.5, p.im - sg*z) < 0.8) nearZero = true;
+            });
+          });
+          if (nearZero || p.age > p.maxAge || Math.abs(p.im) > 60 || p.re < -4 || p.re > 2) {
+            p.re = -2 + Math.random() * 4;
+            p.im = (Math.random() * 100 - 50) * 0.8;
+            p.age = 0;
+            p.maxAge = 200 + Math.random() * 300;
+            p.br = 0.5 + Math.random() * 0.5;
+          }
+
+          pPos[i*3] = ix(p.re);
+          pPos[i*3+1] = 0.1;
+          pPos[i*3+2] = iz(p.im);
+          const green = 0.2 + 0.6 * Math.sin(p.age * 0.02);
+          pCol[i*3] = 0.1;
+          pCol[i*3+1] = green;
+          pCol[i*3+2] = 0.1;
+        }
+        pGeo.attributes.position.needsUpdate = true;
+        pGeo.attributes.color.needsUpdate = true;
+      }
+
+      // ----- STARS (distant field) -----
+      const starCount = 800;
+      const sPos = new Float32Array(starCount * 3);
+      const sCol = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount; i++) {
+        const r = 120 + Math.random() * 90;
+        const theta = Math.acos(2*Math.random()-1);
+        const phi = Math.random() * Math.PI*2;
+        sPos[i*3] = r * Math.sin(theta) * Math.cos(phi);
+        sPos[i*3+1] = r * Math.sin(theta) * Math.sin(phi);
+        sPos[i*3+2] = r * Math.cos(theta);
+        const g = 0.2 + Math.random() * 0.6;
+        sCol[i*3] = g * 0.4;
+        sCol[i*3+1] = g;
+        sCol[i*3+2] = g * 0.3;
+      }
+      const starGeo = new THREE.BufferGeometry();
+      starGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+      starGeo.setAttribute('color', new THREE.BufferAttribute(sCol, 3));
+      const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 0.18, vertexColors: true, transparent: true, opacity: 0.5 }));
+      scene.add(stars);
+
+      // Icosahedron wireframe as distant structure
+      const icoGeo = new THREE.IcosahedronGeometry(62, 1);
+      const icoWire = new THREE.LineSegments(new THREE.EdgesGeometry(icoGeo), new THREE.LineBasicMaterial({ color: 0x2f9, transparent: true, opacity: 0.1 }));
+      scene.add(icoWire);
+
+      // ----- INTERACTION (orbit) -----
+      let isDragging = false, wasDragging = false;
+      let lastX, lastY;
+      canvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        wasDragging = false;
+        lastX = e.clientX;
+        lastY = e.clientY;
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        if (Math.abs(dx) + Math.abs(dy) > 5) wasDragging = true;
+        camState.th -= dx * 0.006;
+        camState.ph = Math.max(0.1, Math.min(Math.PI - 0.1, camState.ph - dy * 0.006));
+        lastX = e.clientX;
+        lastY = e.clientY;
+        updateCamera();
+      });
+      window.addEventListener('mouseup', () => { isDragging = false; });
+      canvas.addEventListener('wheel', (e) => {
+        camState.r = Math.max(15, Math.min(180, camState.r + e.deltaY * 0.04));
+        updateCamera();
+      }, { passive: true });
+
+      // ----- TOOLTIP (zero info) -----
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(zeroMeshes);
+        const tip = document.getElementById('tooltip');
+        if (hits.length > 0) {
+          const obj = hits[0].object;
+          const idx = obj.userData.idx;
+          const z = Z[idx];
+          document.getElementById('tt-title').textContent = `ζ${idx+1} · Im = ${z.toFixed(3)}`;
+          document.getElementById('tt-body').textContent = `Frequency ${(z*10).toFixed(2)} Hz · Waypoint`;
+          tip.style.left = (e.clientX + 16) + 'px';
+          tip.style.top = (e.clientY - 20) + 'px';
+          tip.classList.add('show');
+        } else {
+          tip.classList.remove('show');
+        }
+      });
+
+      // ----- LAYER TOGGLES -----
+      document.getElementById('toggleZeros').addEventListener('click', (e) => {
+        e.target.classList.toggle('on');
+        groups.zeros.visible = e.target.classList.contains('on');
+      });
+      document.getElementById('toggleFlow').addEventListener('click', (e) => {
+        e.target.classList.toggle('on');
+        groups.flow.visible = e.target.classList.contains('on');
+      });
+      document.getElementById('toggleMag').addEventListener('click', (e) => {
+        e.target.classList.toggle('on');
+        groups.mag.visible = e.target.classList.contains('on');
+      });
+      document.getElementById('toggleSchumann').addEventListener('click', (e) => {
+        e.target.classList.toggle('on');
+        groups.schumann.visible = e.target.classList.contains('on');
+      });
+
+      // ----- HUD UPDATE -----
+      function updateHUD() {
+        // approximate current t from camera look direction? we'll use a time variable for demo
+        // but we can also map camera's target point along Im axis
+        // simpler: use a time-varying parameter t
+        const t = (performance.now() * 0.0002) % 60;
+        const mag = zetaMag(t);
+        document.getElementById('hud-t').textContent = t.toFixed(3);
+        document.getElementById('hud-mag').textContent = mag.toFixed(3);
+
+        // find nearest zero
+        let nearest = 1e9, idx = -1;
+        Z.forEach((z, i) => {
+          const d = Math.abs(t - z);
+          if (d < nearest) { nearest = d; idx = i; }
+        });
+        if (idx >= 0) {
+          document.getElementById('hud-wpt').textContent = `ζ${idx+1}`;
+          document.getElementById('hud-dist').textContent = nearest.toFixed(3) + ' i';
+        } else {
+          document.getElementById('hud-wpt').textContent = '—';
+          document.getElementById('hud-dist').textContent = '—';
+        }
+
+        // schumann references
+        document.getElementById('hud-s2').innerHTML = nearest < 1 ? '≈ ζ₁' : '14.3 Hz';
+        document.getElementById('hud-s3').innerHTML = nearest < 2 ? '≈ ζ₂' : '20.8 Hz';
+        document.getElementById('hud-s5').innerHTML = nearest < 5 ? '≈ ζ₅' : '33.8 Hz';
+      }
+
+      // ----- RESET VIEW -----
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'r' || e.key === 'R') {
+          Object.assign(camState, defaultCam);
+          updateCamera();
+        }
+        if (e.key === 'h' || e.key === 'H') {
+          // toggle HUD? not needed
+        }
+      });
+
+      // ----- ANIMATION LOOP -----
+      let clock = 0;
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = 0.016;
+        clock += dt;
+
+        // rotate rings
+        groups.zeros.children.forEach(c => { if (c.userData.isRing) c.rotation.z += dt * 0.5; });
+
+        // pulse zeros
+        zeroMeshes.forEach((m, i) => {
+          const sc = 0.9 + 0.1 * Math.sin(clock * 3 + i);
+          m.scale.set(sc, sc, sc);
+        });
+
+        updateParticles(dt);
+        updateHUD();
+
+        renderer.render(scene, camera);
+      }
+
+      // resize handler
+      function onResize() {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        if (w && h) {
+          renderer.setSize(w, h, false);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+        }
+      }
+      window.addEventListener('resize', onResize);
+      setTimeout(onResize, 10);
+
+      // start after loading screen
+      setTimeout(() => {
+        document.getElementById('loading').style.display = 'none';
+        onResize();
+        animate();
+      }, 2600);
+    })();
+  </script>
+</body>
+</html>
