@@ -1,0 +1,20 @@
+SOVEREIGNTY & DATA MANIFESTO
+
+TOTAL SOVEREIGNTY.
+The Empathy Engine is an absolute closed-loop system operating in your local environment.
+
+1. NO TELEMETRY
+This file does not phone home. It contains zero tracking scripts, zero analytics, and zero cookies. RuinTech LLC does not monitor your flight path, your inspected nodes, or your time in the field.
+
+2. NO EXTERNAL COGNITION
+The generative text within the Comm Link (Persephone-Ψ) is generated 100% client-side using a localized Markov chain. It does not send your inputs to external APIs. Your thoughts, questions, and transmissions stay entirely within the RAM of your local machine and cease to exist the moment you close the tab or press PURGE.
+
+3. THIRD-PARTY LIBRARIES
+The engine fetches two standard visual libraries via highly secure, public CDNs upon loading:
+
+three.min.js (WebGL rendering)
+
+gsap.min.js (Somatic camera transitions)
+No other external connections are made.
+
+The void does not track you. You are free to descend.
